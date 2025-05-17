@@ -1,24 +1,18 @@
 import streamlit as st
 from fpdf import FPDF
-from datetime import datetime, timedelta
+from datetime import datetime
 from PIL import Image
 import io
 
-# ---------------------------
-# Estado inicial
-# ---------------------------
+# Inicializa estados da sessão
 if 'agendamentos' not in st.session_state:
     st.session_state.agendamentos = []
 if 'admin' not in st.session_state:
-    st.session_state.admin = False
-if 'admin_principal' not in st.session_state:
-    st.session_state.admin_principal = False
-if 'admins' not in st.session_state:
-    st.session_state.admins = {"admin@admin.com": "1234"}  # administrador principal
-if 'empresa' not in st.session_state:
-    st.session_state.empresa = {"nome": "Minha Empresa", "descricao": "Descrição da empresa", "logotipo": None}
-if 'artistas' not in st.session_state:
-    st.session_state.artistas = [
+    st.session_state.admin = None
+if 'admin_email' not in st.session_state:
+    st.session_state.admin_email = None
+if 'artistas_disponiveis' not in st.session_state:
+    st.session_state.artistas_disponiveis = [
         {
             "nome": "Bruno Cruz",
             "servicos": [{"nome": "Show musical", "preco": 2500.00}],
@@ -41,149 +35,143 @@ if 'artistas' not in st.session_state:
             "categoria": "Pregadora"
         }
     ]
+if 'admins' not in st.session_state:
+    st.session_state.admins = {}
+if 'empresa' not in st.session_state:
+    st.session_state.empresa = {"nome": "Minha Empresa", "descricao": "Descrição da empresa", "logotipo": None}
 
-# ---------------------------
-# Função para mostrar dados da empresa
-# ---------------------------
-def mostrar_empresa():
+# ADMINISTRADOR PADRÃO
+if 'admin@empresa.com' not in st.session_state.admins:
+    st.session_state.admins['admin@empresa.com'] = 'admin123'
+
+# Função para mostrar dados da empresa no topo
+def mostrar_dados_empresa():
     st.title(st.session_state.empresa["nome"])
     st.write(st.session_state.empresa["descricao"])
     if st.session_state.empresa["logotipo"]:
         st.image(st.session_state.empresa["logotipo"], width=150)
 
-# ---------------------------
-# Função para verificar conflitos
-# ---------------------------
-def horario_disponivel(artista, data, inicio, fim):
+# Função para verificar conflito de horário
+def conflito_horario(artista, data, inicio, fim):
     for ag in st.session_state.agendamentos:
-        if ag["artista"] == artista and ag["data"] == data:
-            ag_inicio = datetime.strptime(ag["inicio"], "%H:%M")
-            ag_fim = datetime.strptime(ag["fim"], "%H:%M")
-            novo_inicio = datetime.strptime(inicio, "%H:%M")
-            novo_fim = datetime.strptime(fim, "%H:%M")
-            if (novo_inicio < ag_fim and novo_fim > ag_inicio):
-                return False
-    return True
+        if ag['artista'] == artista and ag['data'] == data:
+            # Verifica se os horários se sobrepõem
+            if not (fim <= ag['hora_inicio'] or inicio >= ag['hora_fim']):
+                return True
+    return False
 
-# ---------------------------
-# Interface de Agendamento
-# ---------------------------
-def interface_agendamento():
-    st.header("Agendar um artista")
-    nome = st.text_input("Seu nome completo")
-    email = st.text_input("Email")
-    telefone = st.text_input("Telefone")
-    cidade = st.text_input("Cidade")
-    artista_nomes = [a['nome'] for a in st.session_state.artistas]
-    artista_escolhido = st.selectbox("Escolha o artista", artista_nomes)
-    artista = next(a for a in st.session_state.artistas if a['nome'] == artista_escolhido)
-    servico_escolhido = st.selectbox("Escolha o serviço", [s['nome'] for s in artista['servicos']])
-    preco = next(s['preco'] for s in artista['servicos'] if s['nome'] == servico_escolhido)
-    data = st.date_input("Data do evento", min_value=datetime.today())
-    inicio = st.time_input("Horário de início")
-    fim = st.time_input("Horário de término", value=(datetime.combine(datetime.today(), inicio) + timedelta(hours=1)).time())
+# Tela pública de agendamento (sem login)
+def tela_agendamento():
+    mostrar_dados_empresa()
+    st.header("Agendamento de Artista")
 
-    if st.button("Confirmar agendamento"):
-        if not horario_disponivel(artista_escolhido, data.strftime("%Y-%m-%d"), inicio.strftime("%H:%M"), fim.strftime("%H:%M")):
-            st.error("Este horário já está agendado para este artista.")
-        else:
-            st.session_state.agendamentos.append({
-                "nome": nome,
-                "email": email,
-                "telefone": telefone,
-                "cidade": cidade,
-                "artista": artista_escolhido,
-                "servico": servico_escolhido,
-                "preco": preco,
-                "data": data.strftime("%Y-%m-%d"),
-                "inicio": inicio.strftime("%H:%M"),
-                "fim": fim.strftime("%H:%M")
-            })
-            st.success("Agendamento realizado com sucesso!")
+    nome_cliente = st.text_input("Nome do contratante")
+    email_cliente = st.text_input("Email do contratante")
+    telefone_cliente = st.text_input("Telefone do contratante")
+    cidade_cliente = st.text_input("Cidade do contratante")
 
-# ---------------------------
-# Interface de login
-# ---------------------------
-def login_admin():
-    st.subheader("Login do Administrador")
-    email = st.text_input("Email", key="login_email")
-    senha = st.text_input("Senha", type="password", key="login_senha")
+    artista = st.selectbox("Escolha o artista", [a['nome'] for a in st.session_state.artistas_disponiveis])
+    artista_obj = next(a for a in st.session_state.artistas_disponiveis if a['nome'] == artista)
+
+    servico = st.selectbox("Escolha o serviço", [s['nome'] for s in artista_obj['servicos']])
+
+    data = st.date_input("Data do evento")
+    hora_inicio = st.time_input("Hora de início")
+    hora_fim = st.time_input("Hora de término")
+
+    # Botão para confirmar agendamento
+    if st.button("Agendar"):
+        if nome_cliente.strip() == "" or email_cliente.strip() == "":
+            st.error("Preencha nome e email do contratante.")
+            return
+        if hora_fim <= hora_inicio:
+            st.error("Hora de término deve ser depois da hora de início.")
+            return
+        if conflito_horario(artista, data.strftime("%Y-%m-%d"), hora_inicio.strftime("%H:%M"), hora_fim.strftime("%H:%M")):
+            st.error("Já existe agendamento nesse horário para este artista.")
+            return
+        # Busca preço do serviço
+        preco = next(s['preco'] for s in artista_obj['servicos'] if s['nome'] == servico)
+        agendamento = {
+            "nome_cliente": nome_cliente,
+            "email_cliente": email_cliente,
+            "telefone_cliente": telefone_cliente,
+            "cidade_cliente": cidade_cliente,
+            "artista": artista,
+            "servico": servico,
+            "preco": preco,
+            "data": data.strftime("%Y-%m-%d"),
+            "hora_inicio": hora_inicio.strftime("%H:%M"),
+            "hora_fim": hora_fim.strftime("%H:%M"),
+            "status": "Agendado"
+        }
+        st.session_state.agendamentos.append(agendamento)
+        st.success("Agendamento realizado com sucesso!")
+
+# Tela de login do administrador
+def tela_login():
+    st.header("Login do Administrador")
+    email = st.text_input("E-mail")
+    senha = st.text_input("Senha", type="password")
     if st.button("Entrar"):
         if email in st.session_state.admins and st.session_state.admins[email] == senha:
             st.session_state.admin = True
-            if email == "admin@admin.com":
-                st.session_state.admin_principal = True
-            st.success("Login realizado com sucesso")
+            st.session_state.admin_email = email
+            st.success("Login efetuado com sucesso!")
         else:
-            st.error("Email ou senha incorretos")
+            st.error("E-mail ou senha incorretos.")
 
-# ---------------------------
-# Interface administrativa
-# ---------------------------
-def painel_admin():
-    st.header("Painel do Administrador")
+# Tela administrativa (após login)
+def tela_admin():
+    st.sidebar.header(f"Admin: {st.session_state.admin_email}")
+    if st.sidebar.button("Logout"):
+        st.session_state.admin = None
+        st.session_state.admin_email = None
+        st.experimental_rerun()
 
-    aba = st.selectbox("Selecione a aba", ["Empresa", "Artistas", "Agendamentos", "Cadastrar Admin"] if st.session_state.admin_principal else ["Empresa", "Artistas", "Agendamentos"])
+    st.title("Área administrativa")
 
-    if aba == "Empresa":
-        st.subheader("Dados da empresa")
-        st.session_state.empresa["nome"] = st.text_input("Nome da empresa", st.session_state.empresa["nome"])
-        st.session_state.empresa["descricao"] = st.text_area("Descrição", st.session_state.empresa["descricao"])
-        logo = st.file_uploader("Logotipo", type=["png", "jpg"])
-        if logo:
-            st.session_state.empresa["logotipo"] = logo
+    # Gestão da empresa
+    st.subheader("Dados da Empresa")
+    nome_empresa = st.text_input("Nome da empresa", st.session_state.empresa["nome"])
+    descricao_empresa = st.text_area("Descrição da empresa", st.session_state.empresa["descricao"])
+    logo = st.file_uploader("Logotipo da empresa", type=["png", "jpg", "jpeg"])
+    if logo:
+        st.session_state.empresa["logotipo"] = logo.read()
+    if st.button("Salvar dados da empresa"):
+        st.session_state.empresa["nome"] = nome_empresa
+        st.session_state.empresa["descricao"] = descricao_empresa
+        st.success("Dados da empresa salvos.")
 
-    elif aba == "Artistas":
-        st.subheader("Lista de Artistas")
-        for i, a in enumerate(st.session_state.artistas):
-            st.markdown(f"**{a['nome']}** - {a['categoria']}")
-            st.write(a['descricao'])
-            if st.button(f"Excluir {a['nome']}"):
-                st.session_state.artistas.pop(i)
-                st.experimental_rerun()
+    # Lista de artistas
+    st.subheader("Artistas disponíveis")
+    for i, artista in enumerate(st.session_state.artistas_disponiveis):
+        st.write(f"**{artista['nome']}** - Categoria: {artista['categoria']}")
+        st.write(artista['descricao'])
+        servicos = ", ".join([f"{s['nome']} (R${s['preco']:.2f})" for s in artista['servicos']])
+        st.write(f"Serviços: {servicos}")
+        if artista['foto']:
+            image = Image.open(io.BytesIO(artista['foto']))
+            st.image(image, width=120)
+        if st.button(f"Excluir artista {artista['nome']}", key=f"excluir_{i}"):
+            del st.session_state.artistas_disponiveis[i]
+            st.experimental_rerun()
 
-        st.subheader("Cadastrar novo artista")
-        nome = st.text_input("Nome do artista")
-        categoria = st.text_input("Categoria do artista")
-        descricao = st.text_area("Descrição")
-        foto = st.file_uploader("Foto do artista", type=["jpg", "png"])
-        servicos = []
-        with st.expander("Serviços oferecidos"):
-            for i in range(3):
-                nome_serv = st.text_input(f"Nome do serviço {i+1}", key=f"servico_{i}")
-                preco_serv = st.number_input(f"Preço do serviço {i+1}", key=f"preco_{i}", min_value=0.0)
-                if nome_serv:
-                    servicos.append({"nome": nome_serv, "preco": preco_serv})
-        if st.button("Cadastrar artista") and nome and categoria and servicos:
-            st.session_state.artistas.append({"nome": nome, "categoria": categoria, "descricao": descricao, "foto": foto, "servicos": servicos})
-            st.success("Artista cadastrado com sucesso")
+    # Lista de agendamentos
+    st.subheader("Agendamentos")
+    for ag in st.session_state.agendamentos:
+        st.write(f"Cliente: {ag['nome_cliente']} | Artista: {ag['artista']} | Serviço: {ag['servico']} | Data: {ag['data']} | Horário: {ag['hora_inicio']} - {ag['hora_fim']}")
 
-    elif aba == "Agendamentos":
-        st.subheader("Agendamentos realizados")
-        for ag in st.session_state.agendamentos:
-            st.write(ag)
+# Aplicação principal
+def main():
+    st.sidebar.title("Sistema de Agendamento")
+    # Área de login/área pública
+    if st.session_state.admin:
+        tela_admin()
+    else:
+        tela_agendamento()
+        with st.expander("Área do administrador"):
+            tela_login()
 
-    elif aba == "Cadastrar Admin" and st.session_state.admin_principal:
-        email_novo = st.text_input("Email do novo administrador")
-        senha_nova = st.text_input("Senha", type="password")
-        if st.button("Cadastrar novo admin"):
-            if email_novo in st.session_state.admins:
-                st.warning("Este email já está cadastrado")
-            else:
-                st.session_state.admins[email_novo] = senha_nova
-                st.success("Administrador cadastrado")
-
-# ---------------------------
-# Interface principal
-# ---------------------------
-mostrar_empresa()
-interface_agendamento()
-
-st.markdown("---")
-st.markdown("### Acesso administrativo")
-
-if not st.session_state.admin:
-    with st.expander("Login do administrador"):
-        login_admin()
-else:
-    painel_admin()
+if __name__ == "__main__":
+    main()
