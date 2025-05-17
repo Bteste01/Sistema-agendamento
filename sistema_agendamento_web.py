@@ -244,3 +244,53 @@ def painel_admin_principal():
                 st.error("Preencha todos os campos.")
             else:
                 if email_novo in st
+def painel_admin_principal():
+    st.sidebar.header("Painel do Admin Principal")
+    if st.sidebar.button("Cadastrar Novo Administrador"):
+        st.title("Cadastrar Novo Administrador")
+        email_novo = st.text_input("Email do novo administrador")
+        senha_novo = st.text_input("Senha do novo administrador", type="password")
+        if st.button("Salvar Administrador"):
+            if email_novo.strip() == "" or senha_novo.strip() == "":
+                st.error("Preencha todos os campos.")
+            else:
+                if email_novo in st.session_state.admins:
+                    st.error("Este email já está cadastrado como administrador.")
+                else:
+                    st.session_state.admins[email_novo] = {"senha": senha_novo, "principal": False}
+                    st.success(f"Administrador {email_novo} cadastrado com sucesso!")
+                    def main():
+    st.sidebar.title("Sistema de Agendamento")
+    if st.session_state.admin is None:
+        login()
+    else:
+        st.sidebar.write(f"Logado como: {st.session_state.admin_email}")
+        if st.sidebar.button("Logout"):
+            logout()
+            st.experimental_rerun()
+
+        # Se for admin principal
+        is_principal = st.session_state.admin.get("principal", False)
+
+        menu = ["Agendar", "Listar Agendamentos", "Configurar Empresa", "Lista de Artistas"]
+        if is_principal:
+            menu.append("Cadastrar Artista")
+            menu.append("Painel Admin Principal")
+
+        escolha = st.sidebar.radio("Navegação", menu)
+
+        if escolha == "Agendar":
+            agendar()
+        elif escolha == "Listar Agendamentos":
+            listar_agendamentos()
+        elif escolha == "Configurar Empresa":
+            painel_empresa()
+        elif escolha == "Lista de Artistas":
+            listar_artistas()
+        elif escolha == "Cadastrar Artista" and is_principal:
+            cadastrar_artista()
+        elif escolha == "Painel Admin Principal" and is_principal:
+            painel_admin_principal()
+
+if __name__ == "__main__":
+    main()
