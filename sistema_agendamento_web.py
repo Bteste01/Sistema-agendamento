@@ -1,8 +1,7 @@
 import streamlit as st
 from fpdf import FPDF
 from datetime import datetime
-from PIL import Image
-import io
+from PIL import Image import io
 
 #Estado inicial
 
