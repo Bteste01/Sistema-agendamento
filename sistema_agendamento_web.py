@@ -243,7 +243,7 @@ def painel_admin_principal():
             if email_novo.strip() == "" or senha_novo.strip() == "":
                 st.error("Preencha todos os campos.")
             else:
-                if email_novo in st
+                if email_novo in st:
 def painel_admin_principal():
     st.sidebar.header("Painel do Admin Principal")
     if st.sidebar.button("Cadastrar Novo Administrador"):
