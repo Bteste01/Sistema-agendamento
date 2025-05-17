@@ -1,5 +1,5 @@
-import streamlit as st from fpdf import FPDF
-
+import streamlit as st
+from fpdf import FPDF
 Inicialização do estado da sessão
 
 if 'artistas' not in st.session_state: st.session_state.artistas = [] if 'agendamentos' not in st.session_state: st.session_state.agendamentos = []
