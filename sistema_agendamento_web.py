@@ -41,10 +41,11 @@ if 'artistas_disponiveis' not in st.session_state:
         }
     ]
 
-# Interface pública
+# Título e descrição da empresa
 st.title(st.session_state.empresa['nome'])
 st.write(st.session_state.empresa['descricao'])
 
+# --- Área Pública: Agendamento ---
 st.header("Agendar um Artista")
 
 artista_nomes = [a['nome'] for a in st.session_state.artistas_disponiveis]
@@ -98,6 +99,8 @@ if st.button("Confirmar Agendamento"):
         st.success("Agendamento realizado com sucesso!")
 
 st.markdown("---")
+
+# --- Área Pública: Parcerias ---
 st.header("Parcerias com a Empresa")
 nome_parceira = st.text_input("Nome da Empresa Parceira", key="parceria_nome")
 email_parceira = st.text_input("Email para Contato", key="parceria_email")
@@ -110,6 +113,8 @@ if st.button("Enviar Proposta de Parceria"):
         st.error("Preencha nome e email para enviar a proposta.")
 
 st.markdown("---")
+
+# --- Área Pública: Vínculo de Assessoria ---
 st.header("Quero ser Assessorado")
 nome_assessorado = st.text_input("Nome Completo", key="assessoria_nome")
 email_assessorado = st.text_input("Email", key="assessoria_email")
@@ -123,12 +128,14 @@ if st.button("Enviar Solicitação de Vínculo"):
 
 st.markdown("---")
 
-# Botão WhatsApp fixo no rodapé
+# WhatsApp fixo no rodapé
 if st.session_state.whatsapp:
     whatsapp_link = f"https://wa.me/{st.session_state.whatsapp.replace('+', '').replace(' ', '')}"
     st.markdown(f"[Fale conosco no WhatsApp]({whatsapp_link})", unsafe_allow_html=True)
 
 st.markdown("---")
+
+# --- Área do Administrador ---
 with st.expander("Área do Administrador"):
     login_email = st.text_input("Email do administrador", key="login_email")
     login_senha = st.text_input("Senha", type="password", key="login_senha")
@@ -142,38 +149,93 @@ with st.expander("Área do Administrador"):
         else:
             st.error("Credenciais inválidas.")
 
+# --- Painel do Administrador Principal ---
 if st.session_state.get('admin_logado') == 'principal':
     st.header("Painel do Administrador Principal")
 
+    # Cadastrar novo administrador
+    st.subheader("Cadastrar Novo Administrador")
+    novo_admin_email = st.text_input("Email do novo administrador", key="novo_admin_email")
+    novo_admin_senha = st.text_input("Senha do novo administrador", type="password", key="novo_admin_senha")
+    if st.button("Cadastrar Novo Administrador"):
+        if not novo_admin_email.strip() or not novo_admin_senha.strip():
+            st.error("Email e senha são obrigatórios para cadastrar um administrador.")
+        else:
+            if any(admin['email'] == novo_admin_email for admin in st.session_state.admins):
+                st.error("Esse administrador já existe.")
+            else:
+                st.session_state.admins.append({'email': novo_admin_email, 'senha': novo_admin_senha})
+                st.success(f"Administrador {novo_admin_email} cadastrado com sucesso!")
+
+    st.markdown("---")
+
+    # Cadastrar novo artista com múltiplos serviços
     st.subheader("Cadastrar Novo Artista")
     nome_artista_novo = st.text_input("Nome do artista", key="novo_artista_nome")
     descricao_artista_novo = st.text_area("Descrição do artista", key="novo_artista_descricao")
     categoria_artista_novo = st.text_input("Categoria do artista", key="novo_artista_categoria")
     foto_artista_novo = st.file_uploader("Foto do artista (png, jpg)", type=["png", "jpg"], key="novo_artista_foto")
     redes_artista_novo = st.text_area("Redes sociais (URLs, separadas por vírgula)", key="novo_artista_redes")
-    servico_nome_novo = st.text_input("Nome do serviço do artista", key="novo_servico_nome")
-    servico_preco_novo = st.number_input("Preço do serviço (R$)", min_value=0.0, step=0.01, key="novo_servico_preco")
 
-    if st.button("Cadastrar Novo Artista"):
-        if not nome_artista_novo.strip():
-            st.error("Nome do artista é obrigatório.")
+    st.write("Cadastre os serviços do artista:")
+    if 'servicos_temp' not in st.session_state:
+        st.session_state.servicos_temp = []
+
+    nome_servico = st.text_input("Nome do serviço", key="novo_servico_nome")
+    preco_servico = st.number_input("Preço do serviço (R$)", min_value=0.0, step=0.01, key="novo_servico_preco")
+
+    if st.button("Adicionar serviço"):
+        if not nome_servico.strip():
+            st.error("O nome do serviço é obrigatório.")
         else:
-            redes_lista = [r.strip() for r in redes_artista_novo.split(",") if r.strip()]
-            foto = None
-            if foto_artista_novo:
-                foto = Image.open(foto_artista_novo)
-            novo_artista = {
+            st.session_state.servicos_temp.append({"nome": nome_servico, "preco": preco_servico})
+            st.success(f"Serviço '{nome_servico}' adicionado para o artista.")
+
+    if st.button("Cadastrar Artista"):
+        if not nome_artista_novo or not descricao_artista_novo or not categoria_artista_novo:
+            st.error("Preencha todos os campos obrigatórios.")
+        elif not st.session_state.servicos_temp:
+            st.error("Cadastre pelo menos um serviço para o artista.")
+        else:
+            st.session_state.artistas_disponiveis.append({
                 "nome": nome_artista_novo,
+                "servicos": st.session_state.servicos_temp,
+                "foto": foto_artista_novo,
                 "descricao": descricao_artista_novo,
                 "categoria": categoria_artista_novo,
-                "foto": foto,
-                "redes": redes_lista,
-                "servicos": [{"nome": servico_nome_novo, "preco": servico_preco_novo}]
-            }
-            st.session_state.artistas_disponiveis.append(novo_artista)
-            st.success(f"Artista {nome_artista_novo} cadastrado com sucesso!")
+                "redes": [r.strip() for r in redes_artista_novo.split(",") if r.strip()]
+            })
+            st.success(f"Artista '{nome_artista_novo}' cadastrado com sucesso!")
+            st.session_state.servicos_temp = []
 
     st.markdown("---")
-    st.subheader("Excluir Artista")
-    nomes_artistas_admin = [a['nome'] for a in st.session_state.artistas_disponiveis]
-    artista_para_excluir = st.selectbox("Selecione")
+
+    # Listar e excluir artistas
+    st.subheader("Artistas Cadastrados")
+    for idx, artista in enumerate(st.session_state.artistas_disponiveis):
+        with st.expander(f"{artista['nome']}"):
+            st.write("Categoria:", artista["categoria"])
+            st.write("Descrição:", artista["descricao"])
+            if artista["redes"]:
+                for rede in artista["redes"]:
+                    st.markdown(f"- [{rede}]({rede})")
+            for s in artista["servicos"]:
+                st.write(f"Serviço: {s['nome']} - R$ {s['preco']:.2f}")
+            if st.button(f"Excluir {artista['nome']}", key=f"excluir_{idx}"):
+                st.session_state.artistas_disponiveis.pop(idx)
+                st.success(f"Artista '{artista['nome']}' excluído com sucesso!")
+                st.experimental_rerun()
+
+    st.markdown("---")
+
+    # Listar agendamentos
+    st.subheader("Agendamentos Realizados")
+    for ag in st.session_state.agendamentos:
+        st.write(f"**Artista:** {ag['artista']} | **Cliente:** {ag['cliente']} | **Serviço:** {ag['servico']}")
+        st.write(f"Data: {ag['inicio'].strftime('%d/%m/%Y')} - {ag['inicio'].strftime('%H:%M')} até {ag['fim'].strftime('%H:%M')}")
+        st.write(f"Cidade: {ag['cidade']} | Email: {ag['email']} | Telefone: {ag['telefone']}")
+        st.markdown("---")
+
+# --- FIM DO CÓDIGO ---
+
+st.info("Sistema de agendamento online finalizado.")
