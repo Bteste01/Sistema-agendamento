@@ -193,3 +193,13 @@ if st.session_state.admin_logado == 'principal':
     # Listar artistas para excluir
     st.subheader("Excluir Artista")
     nomes_artistas_admin = [a['nome'] for a in st.session_state.artistas_dispon
+                            # Listar artistas para excluir
+    st.subheader("Excluir Artista")
+    nomes_artistas_admin = [a['nome'] for a in st.session_state.artistas_disponiveis]
+    artista_para_excluir = st.selectbox("Selecione o artista para excluir", nomes_artistas_admin)
+
+    if st.button("Excluir artista"):
+        st.session_state.artistas_disponiveis = [
+            a for a in st.session_state.artistas_disponiveis if a['nome'] != artista_para_excluir
+        ]
+        st.success(f"Artista {artista_para_excluir} excluído com sucesso.")
