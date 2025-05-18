@@ -1,191 +1,184 @@
-# sistema_agendamento_web.py
-
 import streamlit as st
 from datetime import datetime, timedelta
 from PIL import Image
-import base64
 import io
+import json
 
-# Dados simulados (memória temporária)
+# Estado inicial
 if 'agendamentos' not in st.session_state:
     st.session_state.agendamentos = []
+if 'admin_principal' not in st.session_state:
+    st.session_state.admin_principal = {'email': 'admin@admin.com', 'senha': 'admin'}
 if 'admins' not in st.session_state:
-    st.session_state.admins = {'admin@admin.com': 'admin'}
-if 'admin_logado' not in st.session_state:
-    st.session_state.admin_logado = False
-if 'parcerias' not in st.session_state:
-    st.session_state.parcerias = []
-if 'vinculos' not in st.session_state:
-    st.session_state.vinculos = []
+    st.session_state.admins = []
+if 'whatsapp' not in st.session_state:
+    st.session_state.whatsapp = ''
+if 'empresa' not in st.session_state:
+    st.session_state.empresa = {'nome': '', 'descricao': '', 'logotipo': None}
+if 'artistas_disponiveis' not in st.session_state:
+    st.session_state.artistas_disponiveis = [
+        {
+            "nome": "Bruno Cruz",
+            "servicos": [{"nome": "Show musical", "preco": 2500.00}],
+            "foto": None,
+            "descricao": "Cantor e compositor com repertório variado.",
+            "categoria": "Cantor"
+        },
+        {
+            "nome": "Skreps",
+            "servicos": [{"nome": "Palestra motivacional", "preco": 1800.00}],
+            "foto": None,
+            "descricao": "Palestrante e influenciador com foco em motivação pessoal.",
+            "categoria": "Palestrante"
+        },
+        {
+            "nome": "Lú Almeida",
+            "servicos": [{"nome": "Ministração gospel", "preco": 2000.00}],
+            "foto": None,
+            "descricao": "Cantora gospel com experiência em eventos religiosos.",
+            "categoria": "Pregadora"
+        }
+    ]
 
-artistas_disponiveis = [
-    {
-        "nome": "Bruno Cruz",
-        "servicos": [{"nome": "Show musical", "preco": 2500.00}],
-        "foto": None,
-        "descricao": "Cantor e compositor com repertório variado.",
-        "categoria": "Cantor"
-    },
-    {
-        "nome": "Skreps",
-        "servicos": [{"nome": "Palestra motivacional", "preco": 1800.00}],
-        "foto": None,
-        "descricao": "Palestrante e influenciador.",
-        "categoria": "Palestrante"
-    },
-    {
-        "nome": "Lú Almeida",
-        "servicos": [{"nome": "Ministração gospel", "preco": 2000.00}],
-        "foto": None,
-        "descricao": "Cantora gospel para eventos religiosos.",
-        "categoria": "Pregadora"
-    }
-]
+# Interface pública (agendamento)
+st.title("Grupo Reobote Serviços")
 
-# Função para verificar conflito de horário
-def tem_conflito(artista, data, inicio, fim):
-    for ag in st.session_state.agendamentos:
-        if ag['artista'] == artista and ag['data'] == data:
-            if not (fim <= ag['inicio'] or inicio >= ag['fim']):
-                return True
-    return False
+if st.session_state.empresa['nome']:
+    st.image(st.session_state.empresa['logotipo'], width=100)
+    st.subheader(st.session_state.empresa['nome'])
+    st.caption(st.session_state.empresa['descricao'])
 
-# Função IA simulada de atendimento
-def ia_responde(pergunta):
-    perguntas_frequentes = {
-        "como agendar": "Você pode agendar um artista pela aba de Agendamento público.",
-        "quais os preços": "Os preços estão listados ao lado dos nomes dos artistas.",
-        "como me tornar parceiro": "Acesse a aba Parceria e envie seus dados.",
-        "assessoria": "Acesse a aba Vínculo de Assessoria para solicitar ingresso."
-    }
-    pergunta = pergunta.lower()
-    for chave, resposta in perguntas_frequentes.items():
-        if chave in pergunta:
-            return resposta
-    return "Desculpe, não entendi sua pergunta. Tente reformular."
+st.header("Agendar um Artista")
 
-st.title("Sistema de Agendamento de Artistas")
+artista_nomes = [a['nome'] for a in st.session_state.artistas_disponiveis]
+artista_selecionado = st.selectbox("Escolha um artista", artista_nomes)
 
-# Telas públicas
-menu = st.sidebar.radio("Menu", ["Agendamento", "Parceria", "Vínculo de Assessoria", "Agrupamento (IA)", "Área do Administrador"])
+artista_info = next(a for a in st.session_state.artistas_disponiveis if a['nome'] == artista_selecionado)
+if artista_info['foto']:
+    st.image(artista_info['foto'], width=150)
+st.write("**Descrição:**", artista_info['descricao'])
+st.write("**Categoria:**", artista_info['categoria'])
 
-if menu == "Agendamento":
-    st.header("Agendamento de Artistas")
-    st.write("Bem-vindo ao agendamento! Escolha um artista, serviço e horário disponível.")
+servico_opcoes = [f"{s['nome']} - R${s['preco']:.2f}" for s in artista_info['servicos']]
+servico_escolhido = st.selectbox("Escolha o serviço", servico_opcoes)
 
-    artista_selecionado = st.selectbox("Artista", [a['nome'] for a in artistas_disponiveis])
-    artista = next(a for a in artistas_disponiveis if a['nome'] == artista_selecionado)
+nome_cliente = st.text_input("Seu nome")
+email_cliente = st.text_input("Email")
+telefone_cliente = st.text_input("Telefone")
+cidade_cliente = st.text_input("Cidade")
+data_evento = st.date_input("Data do evento")
+hora_inicio = st.time_input("Hora de início")
+hora_fim = st.time_input("Hora de término")
 
-    servico = st.selectbox("Serviço", [s['nome'] for s in artista['servicos']])
-    preco = next(s['preco'] for s in artista['servicos'] if s['nome'] == servico)
-    st.write(f"**Preço:** R$ {preco:.2f}")
+if st.button("Confirmar Agendamento"):
+    inicio = datetime.combine(data_evento, hora_inicio)
+    fim = datetime.combine(data_evento, hora_fim)
+    conflito = any(
+        ag['artista'] == artista_selecionado and
+        not (fim <= ag['inicio'] or inicio >= ag['fim'])
+        for ag in st.session_state.agendamentos
+    )
+    if conflito:
+        st.error("Esse horário já está ocupado para este artista.")
+    else:
+        st.session_state.agendamentos.append({
+            'artista': artista_selecionado,
+            'servico': servico_escolhido,
+            'cliente': nome_cliente,
+            'email': email_cliente,
+            'telefone': telefone_cliente,
+            'cidade': cidade_cliente,
+            'inicio': inicio,
+            'fim': fim
+        })
+        st.success("Agendamento realizado com sucesso!")
 
-    nome = st.text_input("Seu nome")
-    email = st.text_input("Seu e-mail")
-    telefone = st.text_input("Telefone")
-    cidade = st.text_input("Cidade")
+# Área pública: Parcerias, Vínculo, IA (Agrupamento)
+st.header("Parcerias com a Empresa")
+st.text_input("Nome da Empresa Parceira")
+st.text_input("Email para Contato")
+st.text_area("Mensagem ou Proposta")
+st.button("Enviar Proposta de Parceria")
 
-    data = st.date_input("Data do evento", min_value=datetime.today())
-    inicio = st.time_input("Início do evento")
-    fim = st.time_input("Término do evento")
+st.header("Quero ser Assessorado")
+st.text_input("Nome Completo")
+st.text_input("Email")
+st.text_area("Conte-nos sobre você e seu trabalho artístico")
+st.button("Enviar Solicitação de Vínculo")
 
-    if st.button("Confirmar Agendamento"):
-        if tem_conflito(artista['nome'], data, inicio, fim):
-            st.error("Este horário já está ocupado para este artista. Escolha outro.")
+st.header("Atendimento Automatizado (Agrupamento)")
+pergunta = st.text_input("Faça sua pergunta")
+if pergunta:
+    st.info("Essa função de IA está em desenvolvimento. Em breve responderá suas perguntas com precisão!")
+
+# Botão de WhatsApp
+if st.session_state.whatsapp:
+    whatsapp_link = f"https://wa.me/{st.session_state.whatsapp.replace('+', '').replace(' ', '')}"
+    st.markdown(f"[Fale conosco no WhatsApp]({whatsapp_link})", unsafe_allow_html=True)
+
+# Botão de login do admin
+st.markdown("---")
+with st.expander("Área do Administrador"):
+    login_email = st.text_input("Email do administrador")
+    login_senha = st.text_input("Senha", type="password")
+    if st.button("Entrar"):
+        if login_email == st.session_state.admin_principal['email'] and login_senha == st.session_state.admin_principal['senha']:
+            st.session_state.admin_logado = 'principal'
+            st.success("Login como administrador principal!")
+        elif any(a['email'] == login_email and a['senha'] == login_senha for a in st.session_state.admins):
+            st.session_state.admin_logado = login_email
+            st.success("Login como administrador!")
         else:
-            st.session_state.agendamentos.append({
-                "artista": artista['nome'],
-                "servico": servico,
-                "cliente": nome,
-                "email": email,
-                "telefone": telefone,
-                "cidade": cidade,
-                "data": data,
-                "inicio": inicio,
-                "fim": fim
-            })
-            st.success("Agendamento realizado com sucesso!")
+            st.error("Credenciais inválidas.")
 
-    st.markdown("---")
-    st.markdown("**Fale conosco no WhatsApp:**")
-    st.markdown("[Clique aqui para abrir o WhatsApp](https://wa.me/5511999999999)")
+# Interface do administrador principal
+if st.session_state.get('admin_logado') == 'principal':
+    st.header("Painel do Administrador Principal")
+    st.subheader("Cadastrar Novo Administrador")
+    email_novo = st.text_input("Email do novo administrador")
+    senha_nova = st.text_input("Senha", type="password")
+    if st.button("Cadastrar Novo Administrador"):
+        if email_novo in [a['email'] for a in st.session_state.admins]:
+            st.warning("Administrador já cadastrado")
+        else:
+            st.session_state.admins.append({"email": email_novo, "senha": senha_nova})
+            st.success("Novo administrador cadastrado com sucesso")
 
-elif menu == "Parceria":
-    st.header("Proposta de Parceria")
-    nome_empresa = st.text_input("Nome da empresa")
-    nome_resp = st.text_input("Nome do responsável")
-    email_parc = st.text_input("Email para contato")
-    tel_parc = st.text_input("Telefone")
-    tipo = st.text_input("Tipo de parceria")
-    mensagem = st.text_area("Mensagem")
+    st.subheader("Configurações da Empresa")
+    nome_empresa = st.text_input("Nome da empresa", value=st.session_state.empresa['nome'])
+    descricao_empresa = st.text_area("Descrição", value=st.session_state.empresa['descricao'])
+    logotipo = st.file_uploader("Logotipo", type=["png", "jpg"])
+    whatsapp_numero = st.text_input("Número de WhatsApp para contato", value=st.session_state.whatsapp)
+    if st.button("Salvar Dados da Empresa"):
+        st.session_state.empresa['nome'] = nome_empresa
+        st.session_state.empresa['descricao'] = descricao_empresa
+        if logotipo:
+            st.session_state.empresa['logotipo'] = Image.open(logotipo)
+        st.session_state.whatsapp = whatsapp_numero
+        st.success("Dados da empresa atualizados com sucesso")
 
-    if st.button("Enviar proposta"):
-        st.session_state.parcerias.append({
-            "empresa": nome_empresa,
-            "responsavel": nome_resp,
-            "email": email_parc,
-            "telefone": tel_parc,
-            "tipo": tipo,
-            "mensagem": mensagem
-        })
-        st.success("Proposta enviada com sucesso!")
+    st.subheader("Lista de Agendamentos")
+    for ag in st.session_state.agendamentos:
+        st.write(f"{ag['cliente']} agendou {ag['servico']} com {ag['artista']} em {ag['inicio']} até {ag['fim']} - {ag['cidade']} - {ag['telefone']}")
 
-elif menu == "Vínculo de Assessoria":
-    st.header("Solicitação de Vínculo com Assessoria")
-    nome_artistico = st.text_input("Nome artístico")
-    categoria = st.text_input("Categoria (Cantor, Palestrante...)")
-    estilo = st.text_input("Estilo musical ou atuação")
-    contato_email = st.text_input("Email")
-    contato_tel = st.text_input("Telefone")
-    portfolio = st.text_input("Link do portfólio")
-    foto = st.file_uploader("Foto do artista", type=["jpg", "png"])
-    apresentacao = st.text_area("Mensagem de apresentação")
+    st.subheader("Backup e Restauração")
+    if st.button("Fazer backup dos dados"):
+        dados_backup = {
+            "agendamentos": st.session_state.agendamentos,
+            "artistas_disponiveis": st.session_state.artistas_disponiveis,
+            "admins": st.session_state.admins,
+            "empresa": st.session_state.empresa,
+            "whatsapp": st.session_state.whatsapp
+        }
+        conteudo_json = json.dumps(dados_backup, default=str, indent=2)
+        st.download_button("Clique para baixar o backup", conteudo_json, file_name="backup_agendamentos.json")
 
-    if st.button("Solicitar vínculo"):
-        st.session_state.vinculos.append({
-            "nome": nome_artistico,
-            "categoria": categoria,
-            "estilo": estilo,
-            "email": contato_email,
-            "telefone": contato_tel,
-            "portfolio": portfolio,
-            "foto": foto,
-            "apresentacao": apresentacao
-        })
-        st.success("Solicitação enviada com sucesso!")
-
-elif menu == "Agrupamento (IA)":
-    st.header("Atendimento Automático")
-    pergunta = st.text_input("Digite sua pergunta")
-    if st.button("Perguntar"):
-        resposta = ia_responde(pergunta)
-        st.info(resposta)
-
-elif menu == "Área do Administrador":
-    if not st.session_state.admin_logado:
-        st.subheader("Login do Administrador")
-        login = st.text_input("E-mail")
-        senha = st.text_input("Senha", type="password")
-        if st.button("Entrar"):
-            if st.session_state.admins.get(login) == senha:
-                st.session_state.admin_logado = True
-                st.success("Login realizado com sucesso!")
-            else:
-                st.error("Credenciais inválidas")
-
-    if st.session_state.admin_logado:
-        st.subheader("Área do Administrador")
-        st.write("Agendamentos confirmados:")
-        for ag in st.session_state.agendamentos:
-            st.markdown(f"**{ag['data']} - {ag['artista']} ({ag['servico']})** - {ag['inicio']} até {ag['fim']}, Cliente: {ag['cliente']} - {ag['cidade']}")
-
-        if st.checkbox("Visualizar solicitações de parceria"):
-            for p in st.session_state.parcerias:
-                st.write(p)
-
-        if st.checkbox("Visualizar solicitações de vínculo de assessoria"):
-            for v in st.session_state.vinculos:
-                st.write(v)
-
-        if st.button("Sair do sistema"):
-            st.session_state.admin_logado = False
+    arquivo_backup = st.file_uploader("Carregar backup (.json)", type=["json"])
+    if arquivo_backup:
+        dados = json.load(arquivo_backup)
+        st.session_state.agendamentos = dados.get("agendamentos", [])
+        st.session_state.artistas_disponiveis = dados.get("artistas_disponiveis", [])
+        st.session_state.admins = dados.get("admins", [])
+        st.session_state.empresa = dados.get("empresa", {})
+        st.session_state.whatsapp = dados.get("whatsapp", "")
+        st.success("Backup carregado com sucesso!")
